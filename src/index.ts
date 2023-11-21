@@ -10,7 +10,7 @@ export interface Config {
 export const inject = ['database'];
 
 export const Config: Schema<Config> = Schema.object({
-  apiKey: Schema.string().description('填写glm-key').required(),
+  apiKey: Schema.string().description('gpt-key').required(),
   url: Schema.string().description('openai站点').required()
 });
 
@@ -41,31 +41,31 @@ export function apply(ctx: Context, config: Config) {
     data: 'string'
   });
 
-  ctx.command('crpg', 'RPG-GLM');
+  ctx.command('crpg', 'RPG-GPT');
 
   ctx.command('crpg')
-    .subcommand('.on', '启动RPG模式')
+    .subcommand('.on', '启动/重置RPG模式')
     .option('type', '-t <type:number>')
     .action(async v => {
       const uid = v.session.author.id;
+      if (v.options.type > gamesCard.length || v.options.type < 1) { return v.session.send(`<at id="${v.session.username}" /> 木有这个卡带哦`); }
       await ctx.database.upsert('gamesbotDB', [
         { id: uid, status: 1, card: (v.options.type) ? v.options.type : 0 }
       ]);
 
       const dataTemp = await ctx.database.get('gamesbotDB', { id: uid });
       const data = dataTemp[0];
-      if (data.data.length == 0) {
-        data.data = JSON.stringify([{
-          role: 'user',
-          content: gamesCard[data.card]
-        }]);
+      data.data = JSON.stringify([{
+        role: 'user',
+        content: gamesCard[data.card]
+      }]);
 
-        await ctx.database.upsert('gamesbotDB', [
-          { id: uid, data: data.data }
-        ]);
-      }
+      await ctx.database.upsert('gamesbotDB', [
+        { id: uid, data: data.data }
+      ]);
 
 
+      v.session.send(`<at id="${v.session.username}" /> RPG启动(重置)成功！如果你是第一次游玩的话！请先发crpg.load哦`);
     });
 
   ctx.command('crpg')
@@ -92,17 +92,18 @@ export function apply(ctx: Context, config: Config) {
       const uid = v.session.author.id;
       const dataTemp = await ctx.database.get('gamesbotDB', { id: uid });
       const data = dataTemp[0];
-      if (data.status == 0) { return v.session.send(`<at id="${v.session.author.name}"/>你还没有启动crpg，请发送help crpg查看相应的帮助来启动它叭！`); }
+      if (data.status == 0) { return v.session.send(`<at id="${v.session.username}"/> 你还没有启动crpg，请发送help crpg查看相应的帮助来启动它叭！`); }
       const dataObj = JSON.parse(data.data);
 
       const pack = {
-        model: 'chatglm3-6b',
+        model: 'gpt-3.5-turbo',
         stream: false,
         temperature: 0.8,
         top_p: 0.8,
         messages: dataObj
       };
 
+      v.session.send(`<at id="${v.session.username}" /> 加载中...`);
       const backData = await ctx.http.post(`${config.url}/v1/chat/completions`, pack, {
         headers: {
           'Authorization': `Bearer ${config.apiKey}`
@@ -117,31 +118,37 @@ export function apply(ctx: Context, config: Config) {
       const outData = JSON.stringify(dataObj);
       await ctx.database.upsert('gamesbotDB', [{ id: uid, data: outData }]);
 
-      v.session.send(content);
+      v.session.send(`<at id="${v.session.username}" /> ${content}`);
     });
 
   ctx.command('crpg')
-    .subcommand('.command <option:string>', '选项')
+    .subcommand('.command <option:text>', '对GM说的内容')
     .action(async v => {
       const uid = v.session.author.id;
       const dataTemp = await ctx.database.get('gamesbotDB', { id: uid });
       const data = dataTemp[0];
-      if (data.status == 0) { return v.session.send(`<at id="${v.session.author.name}"/>你还没有启动crpg，请发送help crpg查看相应的帮助来启动它叭！`); }
+      if (data.status == 0) { return v.session.send(`<at id="${v.session.username}"/> 你还没有启动crpg，请发送help crpg查看相应的帮助来启动它叭！`); }
       const dataObj = JSON.parse(data.data);
 
+      // 条数过多时自动清理第4，5条
+
+      if (dataObj.length > 20) {
+        dataObj.splice(4, 2);
+      }
       dataObj.push({
         role: 'user',
         content: v.args[0] // 输入的选项
       });
 
       const pack = {
-        model: 'chatglm3-6b',
+        model: 'gpt-3.5-turbo',
         stream: false,
         temperature: 0.8,
         top_p: 0.8,
         messages: dataObj
       };
 
+      v.session.send(`<at id="${v.session.username}" /> 加载中...`);
       const backData = await ctx.http.post(`${config.url}/v1/chat/completions`, pack, {
         headers: {
           'Authorization': `Bearer ${config.apiKey}`
@@ -157,11 +164,11 @@ export function apply(ctx: Context, config: Config) {
       const outData = JSON.stringify(dataObj);
       await ctx.database.upsert('gamesbotDB', [{ id: uid, data: outData }]);
 
-      v.session.send(content);
+      v.session.send(`<at id="${v.session.username}" /> ${content}`);
     });
 
   ctx.command('crpg')
-    .subcommand('.reload', '重新加载本次')
+    .subcommand('.reload', '重开本条')
     .action(async v => {
       const uid = v.session.author.id;
       const dataTemp = await ctx.database.get('gamesbotDB', { id: uid });
@@ -171,13 +178,14 @@ export function apply(ctx: Context, config: Config) {
       dataObj.pop();
 
       const pack = {
-        model: 'chatglm3-6b',
+        model: 'gpt-3.5-turbo',
         stream: false,
         temperature: 0.8,
         top_p: 0.8,
         messages: dataObj
       };
 
+      v.session.send(`<at id="${v.session.username}" /> 加载中...`);
       const backData = await ctx.http.post(`${config.url}/v1/chat/completions`, pack, {
         headers: {
           'Authorization': `Bearer ${config.apiKey}`
@@ -193,6 +201,6 @@ export function apply(ctx: Context, config: Config) {
       const outData = JSON.stringify(dataObj);
       await ctx.database.upsert('gamesbotDB', [{ id: uid, data: outData }]);
 
-      v.session.send(content);
+      v.session.send(`<at id="${v.session.username}" /> ${content}`);
     });
 }
