@@ -65,7 +65,7 @@ export function apply(ctx: Context, config: Config) {
       ]);
 
 
-      v.session.send(`<at id="${v.session.username}" /> RPG启动(重置)成功！如果你是第一次游玩的话！请先发crpg.load哦`);
+      v.session.send(`<at id="${v.session.username}" /> RPG启动(重置)成功！请先发crpg.load哦！`);
     });
 
   ctx.command('crpg')
