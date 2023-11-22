@@ -13,7 +13,8 @@
   "keywords": [
     "chatbot",
     "koishi",
-    "plugin"
+    "plugin",
+    "games"
   ],
   "peerDependencies": {
     "koishi": "~4.15.4"
