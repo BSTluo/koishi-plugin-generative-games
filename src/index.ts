@@ -130,11 +130,12 @@ export function apply(ctx: Context, config: Config) {
       if (data.status == 0) { return v.session.send(`<at id="${v.session.username}"/> 你还没有启动crpg，请发送help crpg查看相应的帮助来启动它叭！`); }
       const dataObj = JSON.parse(data.data);
 
-      // 条数过多时自动清理第4，5条
+      // 条数过多时自动清理第2，3条
 
-      if (dataObj.length > 20) {
-        dataObj.splice(4, 2);
+      if (dataObj.length >= 10) {
+        dataObj.splice(2, 2);
       }
+
       dataObj.push({
         role: 'user',
         content: v.args[0] // 输入的选项
@@ -145,26 +146,32 @@ export function apply(ctx: Context, config: Config) {
         stream: false,
         temperature: 0.8,
         top_p: 0.8,
-        messages: dataObj
+        messages: dataObj,
+        max_token: 8096
       };
 
       v.session.send(`<at id="${v.session.username}" /> 加载中...`);
-      const backData = await ctx.http.post(`${config.url}/v1/chat/completions`, pack, {
-        headers: {
-          'Authorization': `Bearer ${config.apiKey}`
-        }
-      });
-      const { role, content } = backData.choices[0].message;
-      const outDataTemp = {
-        role: role,
-        content: content
-      };
+      try {
+        const backData = await ctx.http.post(`${config.url}/v1/chat/completions`, pack, {
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`
+          }
+        });
+        console.log(backData);
+        const { role, content } = backData.choices[0].message;
+        const outDataTemp = {
+          role: role,
+          content: content
+        };
 
-      dataObj.push(outDataTemp);
-      const outData = JSON.stringify(dataObj);
-      await ctx.database.upsert('gamesbotDB', [{ id: uid, data: outData }]);
+        dataObj.push(outDataTemp);
+        const outData = JSON.stringify(dataObj);
+        await ctx.database.upsert('gamesbotDB', [{ id: uid, data: outData }]);
 
-      v.session.send(`<at id="${v.session.username}" /> ${content}`);
+        v.session.send(`<at id="${v.session.username}" /> ${content}`);
+      } catch (err) {
+        console.log(err);
+      }
     });
 
   ctx.command('crpg')
